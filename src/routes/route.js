@@ -9,7 +9,7 @@ const urlcon=require("../controllers/urlcontroller")
 Router.post("/shorten",urlcon.urlShort)
 
 
-Router.get("/:urlCode",urlcon.longUrl)
+Router.get("/:urlCode",urlcon.getUrlCode)
 
 
 

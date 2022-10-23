@@ -1,4 +1,4 @@
-const mongoose = require("mongoose")
+//const mongoose = require("mongoose")
 const urlModel = require("../models/urlModel")
 
 const { isValid,ValidUrl, isValidBody } = require("../validator/validator");
@@ -11,12 +11,12 @@ const { promisify } = require("util");
 
 //Connect to redis
 const redisClient = redis.createClient(
-    17983,
-    "redis-17983.c74.us-east-1-4.ec2.cloud.redislabs.com",
+    11697,
+    "redis-11697.c262.us-east-1-3.ec2.cloud.redislabs.com",
 
     { no_ready_check: true }
 );
-redisClient.auth("W1ZrPOS3PmtQglr3iwL4yM4MchtUqYg8", function (err) {
+redisClient.auth("Z4swFVvm3beErEZzZ4n0T6fi8QlAtqbs", function (err) {
     if (err) throw err;
 });
 
@@ -29,15 +29,6 @@ redisClient.on("connect", async function () {
 
 const SET_ASYNC = promisify(redisClient.SET).bind(redisClient);
 const GET_ASYNC = promisify(redisClient.GET).bind(redisClient);
-
-
-
-
-
-
-
-
-
 const urlShort = async (req, res) => {
     try {
         const data = req.body;
@@ -66,7 +57,7 @@ const urlShort = async (req, res) => {
         let checkLongUrl = await urlModel.findOne({ longUrl: longUrl })
 
         if (checkLongUrl) {
-            return res.status(200).send({ status: true, data: checkLongUrl })
+            return res.status(201).send({ status: true, data: checkLongUrl })
         }
 
         //creating urlCode
@@ -94,38 +85,26 @@ const urlShort = async (req, res) => {
 };
 
 
-
-
-
-//--------------------------------get url----------------------
-const longUrl = async (req, res) => {
+const getUrlCode = async function (req, res) {
     try {
-
-        const urlcode = req.params.urlCode
-        if(urlcode==":urlCode"){
-            return res.status(400).send({ status: false, message: "please enter urlcode in path param" })
-        }
-        if(/.[A-Z]./.test(urlcode)){
-            return res.status(400).send({ status: false, message: "please enter urlcode in lowercase" })
-
-        }
-        if(!/^[a-z0-9]{6,14}$/.test(urlcode)){
-            return res.status(400).send({ status: false, message: "please enter valid urlcode " })
-
-        }
-
-        let cahcedProfileData = await GET_ASYNC(urlcode)
-        if (cahcedProfileData) {
-            res.status(302).send(cahcedProfileData)
+        // find a document match to the code in req.params.code
+        if(!shortid.isValid(req.params.urlCode)  )   return res.status(400).send({ status: false, message: 'Wrong UrlCode' })
+        let cachedUrl = await GET_ASYNC(`${req.params.urlCode}`)
+        if(cachedUrl)    return res.status(302).redirect(cachedUrl)
+        const url = await urlModel.findOne({
+            urlCode: req.params.urlCode
+        })
+        if (url) {
+            await SET_ASYNC(`${req.params.urlCode}`, url.longUrl)
+            return res.status(302).redirect(url.longUrl)
         } else {
-
-            let savedData = await urlModel.findOne({ data: urlcode });
-            await SET_ASYNC(urlcode, JSON.stringify(savedData))
-            res.send({ data: savedData });
+            return res.status(404).send({ status: false, message: 'No URL Found' })
         }
-       
-    } catch (err) {
-        res.status(500).send({ sattus: false, message: err.message });
+
+    }
+    catch (err) {
+        console.error(err)
+        res.status(500).send({ status: false, message: err.message })
     }
 }
 
@@ -133,4 +112,6 @@ const longUrl = async (req, res) => {
 
 
 
-module.exports = { urlShort, longUrl }
+
+module.exports.urlShort=urlShort
+module.exports.getUrlCode=getUrlCode
